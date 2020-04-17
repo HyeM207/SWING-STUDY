@@ -20,8 +20,8 @@ while num!=3:   # 숫자 3 입력시, 게임 종료하기
                 print("정답입니다!!\n"+str(i)+"번만에 맞추셨습니다") # 정답이라 알려주기.
                 if len(ranking)==0 or ranking[0] > i:   #만약, 기록 최대값이 들어간 0번째 값보다 기회횟수가 적다면 ( 최대 기록이라면, )
                     print("최고기록 갱신~!")        #'최대기록'이라고 알려준다.
-                ranking.append(i)   # 정답을 맞췄으니, ranking 리스트에 기록을 해준다.
-                ranking.sort()      #다음 기록저장&확인을 위해, sort함수를 이용해 오름차순으로 정렬을 해준다. 
+                    ranking.append(i)   # ranking 리스트에 기록을 해준다.
+                    ranking.sort()      #다음 기록저장&확인을 위해, sort함수를 이용해 오름차순으로 정렬을 해준다. 
                 break
             elif i==10 :    #시도횟수를 초과하면 알려주기
                 print("입력횟수를 초과하였습니다. 게임오버!")
