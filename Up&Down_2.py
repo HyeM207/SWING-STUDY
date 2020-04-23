@@ -60,6 +60,7 @@ while num!=3:   # 숫자 3(게임종료)
                 break
             elif tryCount==10 :    #시도횟수를 초과하면 알려주기
                 print("입력횟수를 초과하였습니다. 게임오버!")
+                break   #<--2주차피드백1
             elif guess>answer:  #정답보다 큰 수를 입력시, 'DOWN'이라고 출력
                 print("DOWN")
                 max=guess-1       #다음 번 시도에 입력할 숫자 범위를 알려주기 위해, max에 값을 저장한다.
