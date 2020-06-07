@@ -1,4 +1,0 @@
-ab:1
-applemango:2
-juice:4
-apple:5
