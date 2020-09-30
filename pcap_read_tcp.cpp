@@ -54,8 +54,7 @@ void dump_pkt(const u_char *pkt_data, struct pcap_pkthdr* header){
 
     struct ip * ip_hdr=(struct ip*)(pkt_data+sizeof(ether_header));
 
-    
-   //if type is not TCP , return function
+  //if type is not TCP , return function
     if(ip_hdr->ip_p!=6) return;
     
     //size !!!!
@@ -66,11 +65,6 @@ void dump_pkt(const u_char *pkt_data, struct pcap_pkthdr* header){
     u_int8_t ip_offset=ip_hdr->ip_hl;
 
     printf("\nPacket Info=======================\n");
-        // printf("sizeof(ether_header): %d\n",sizeof(ether_header));
-        //printf("sizeof(ip_hdr): %d\n",sizeof(ip_hdr));
-        //printf("ip_length : %d\n",ntohs(ip_length)/2);
-        //if type is not TCP , return function
-        //printf("ip type : %x\n",ip_hdr->ip_p);
     
     //print pkt length
     printf("%u bytes captured\n", header->caplen);
