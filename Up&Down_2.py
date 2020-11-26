@@ -10,7 +10,7 @@ import random  #랜덤으로 수를 만들기 위해 random 라이브러리 추�
     # 1. open으로 파일을 열어, 파일 전체 내용을 lines에 리스트로 저장한다.
     # 2. :를 기준으로 이름은 names리스트의 0인덱스에, 숫자(랭킹)은 ranking배열의 0인덱스에 int형으로 저장한다.
 def loading():
-    f=open("C:/Users/김혜민/Desktop/python 코드/python스터디/swing.txt",'r')
+    f=open("C:/Users/xxx/swing.txt",'r')
     lines=f.readlines() #파일 전체 내용 lines에 저장
     for line in lines:
         names.append(line[:line.index(":")])    #이름은 ranking의 0인덱스에
@@ -21,7 +21,7 @@ def loading():
 # # 함수 정의2 (프로그램 종료 전, 기록 저장하는 함수)
     # 1. 파일을 열고, names와 ranking리스트에 저장된 각 요소들을 한줄로 만들어 파일에 저장한다.
 def close():
-    f=open("C:/Users/김혜민/Desktop/python 코드/python스터디/swing.txt",'w')
+    f=open("C:/Users/xxx/swing.txt",'w')
     for name,rank in zip(names,ranking): #names와 ranking리스트에서 각 요소를 
          w=name+":"+str(rank)+"\n" # :와 \n로 합쳐 한줄로 만든다.
          f.write(w)     #파일에 한줄씩 기록
