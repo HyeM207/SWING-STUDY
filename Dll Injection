@@ -1,0 +1,76 @@
+#include "windows.h"
+#include "tchar.h"   //이거는 _tmain을 위해서 필요함
+
+bool InjectDll(DWORD dwPID, LPCTSTR Dllpath);
+
+
+int _tmain(int argc, TCHAR * argv[]) {  
+
+	if (argc != 5) {
+		_tprintf(L"USAGE : %s -p \"pid\" -a \"dll_path\" \n", argv[0]);
+	}
+	
+	//stol : string to long int
+	// long int : 4byte 
+	// dword = unsigned long : 4byte
+	// lpctstr : long pointer constant t_string = const tchar * 
+  
+	if (InjectDll ((DWORD)_tstol(argv[2]), argv[4]) )  {
+		_tprintf(L"Injection %s Success!!!\n",argv[4]);
+	}
+	else {
+		_tprintf(L"Injection %s failed!!!\n",argv[4]);
+	}
+	return 0;
+}
+
+
+bool InjectDll(DWORD dwPID,LPCTSTR Dllpath) {
+
+	HANDLE hTargetProc, hThread = NULL; //#1, #6
+	LPVOID dllBufAlloc = NULL;  //#2
+	HMODULE hMod = NULL; //#3
+	DWORD dwBufSize = (DWORD)(_tcslen(Dllpath) + 1) * sizeof(TCHAR); //#2.3
+	HMODULE hKernel32 = NULL; //#4
+	LPTHREAD_START_ROUTINE IpfnLoadLibrary; //#5
+
+	//#1. 대상 프로세스 핸들 구하기 
+	if (!(hTargetProc = OpenProcess(PROCESS_ALL_ACCESS, FALSE, dwPID))) {
+		_tprintf(L"Error! OpenProcess(%d) failed [%d]\n", dwPID, GetLastError());
+		return false;
+	}
+
+
+	//#2. 대상 프로세스 메모리에 공간에 버퍼 할당
+	if (!(dllBufAlloc = VirtualAllocEx(hTargetProc, NULL, dwBufSize, MEM_COMMIT, PAGE_READWRITE)) ) {
+		_tprintf(L"Error! VirtualAllocEx(%d) failed [%d]\n", dwPID, GetLastError());
+		return false;
+	}
+
+
+	//#3. 할당받은 대상 프로세스 메모리에 dll 경로 써주기
+	if (!(WriteProcessMemory(hTargetProc, dllBufAlloc, (LPVOID)Dllpath, dwBufSize,NULL))) {
+		_tprintf(L"Error! WriteProcessMemory(%d) failed [%d]\n", dwPID, GetLastError());
+		return false;
+	}
+
+	//#4. LoadLibraryW() API 주소 구하기
+			//loadLibrary 또는 getmoduleHandle
+	hKernel32 = LoadLibrary(L"Kernel32.dll");  //책에서는 getModuleHandle로 함
+	if (!hKernel32) {
+		_tprintf(L"Error! LoadLibrary(%d) failed [%d]\n", dwPID, GetLastError());
+		return false;
+	}
+	IpfnLoadLibrary = (LPTHREAD_START_ROUTINE)GetProcAddress(hKernel32, "LoadLibraryW");
+
+
+	//#5. 대상 프로세스에 원격 스레드 실행
+	hThread = CreateRemoteThread(hTargetProc, NULL, 0, IpfnLoadLibrary, dllBufAlloc, 0, NULL);
+
+	//6. 
+	WaitForSingleObject(hThread, INFINITE);
+	CloseHandle(hThread);
+	CloseHandle(hTargetProc);
+
+	return TRUE;
+	}
