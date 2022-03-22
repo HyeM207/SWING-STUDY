@@ -1,0 +1,174 @@
+#include "windows.h"
+#include "tlhelp32.h"
+#include "tchar.h"
+
+/* 
+   #/=======================================================/#
+	코드는  책 '리버싱 핵심 원리'를 참고하였습니다. 
+  #/=======================================================/#
+*/
+
+
+    // 1. ejection할 대상 dll, process 설정
+#define DEF_PROC_NAME (L"notepad.exe")
+#define DEF_DLL_NAME (L"myhack.dll")
+
+DWORD FindProcessID(LPCTSTR szProcessName);
+BOOL SetPrivilege(LPCTSTR lpszPrivilege, BOOL bEnablePrivilege);
+BOOL EjectDll(DWORD dwPID, LPCTSTR szDllName);
+
+int _tmain(int argc, TCHAR* argv[]) {
+	DWORD dwPID = 0xFFFFFFFF;
+
+
+	// 2. process 찾기
+	dwPID = FindProcessID(DEF_PROC_NAME);
+	if (dwPID == 0xffffffff) {			//인자값이 없을때 
+		_tprintf(L"There is no %s process!\n", DEF_PROC_NAME);
+		return 1;
+	}
+
+	_tprintf(L"PID of \"%s\" is %d\n", DEF_PROC_NAME, dwPID); 	// 현재 ejection할 process PID 출력
+
+
+	// 3. privilege 설정해주기
+	if (!SetPrivilege(SE_DEBUG_NAME, TRUE)) {
+		return 1;
+	}
+
+
+	// 4. DLL Ejection
+	if ( EjectDll(dwPID, DEF_DLL_NAME))
+	{
+		_tprintf(L"EjectDLL(%d, \"%s\") success\n ", dwPID, DEF_DLL_NAME);
+	}
+	else {
+		_tprintf(L"EjectDLL((%d, \"%s\") failed\n ", dwPID, DEF_DLL_NAME);
+	}
+
+	return 0;
+}
+
+
+DWORD FindProcessID(LPCTSTR szProcessName)
+{
+	DWORD dwPID = 0xffffffff;
+	HANDLE hSnapShot = INVALID_HANDLE_VALUE;
+	PROCESSENTRY32 pe;
+
+	// 2-1.  프로세스에 로딩된 DLL 정보구하기 
+	pe.dwSize = sizeof(PROCESSENTRY32);
+	hSnapShot = CreateToolhelp32Snapshot(TH32CS_SNAPALL, NULL);  // 구한 핸들을  hSnapShot에 저장함
+
+	// 2-2. 위에서 구한 핸들로 해당 프로세스 ID (PID)를 찾는다.
+	Process32First(hSnapShot, &pe);
+
+	do {
+		if (!_tcsicmp(szProcessName, (LPCTSTR)pe.szExeFile))
+		{
+			dwPID = pe.th32ProcessID;
+			break;
+		}
+	} while (Process32Next(hSnapShot, &pe));
+
+
+	// 2-3. 작업을 마친 뒤엔, 핸들 닫아줌
+	CloseHandle(hSnapShot);
+
+	return dwPID;
+
+
+}
+
+
+BOOL SetPrivilege(LPCTSTR lpszPrivilege, BOOL bEnablePrivilege) {
+
+	TOKEN_PRIVILEGES tp;
+	HANDLE hToken;
+	LUID luid;
+
+	if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken) )
+	{
+		_tprintf(L"OpenProcessToken error : %u\n", GetLastError());
+		return FALSE;
+	}
+
+	if ( !LookupPrivilegeValue(NULL, lpszPrivilege, &luid) ) {
+		_tprintf(L"LookupPirivilegeValue error : %u\n", GetLastError());
+		return FALSE;
+	}
+
+	tp.PrivilegeCount = 1;
+		tp.Privileges[0].Luid = luid;
+		if (bEnablePrivilege)
+			tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+		else
+			tp.Privileges[0].Attributes = 0;
+
+
+		if (!AdjustTokenPrivileges(hToken, FALSE, &tp, sizeof(TOKEN_PRIVILEGES), (PTOKEN_PRIVILEGES)NULL, (PDWORD)NULL)) {
+				_tprintf(L"AdjustTokenPrivileges error : %u\n", GetLastError() );
+				return FALSE;
+		}
+
+		if (GetLastError() == ERROR_NOT_ALL_ASSIGNED)
+		{
+			 _tprintf(L"The token does not have the specified privilege. \n");
+				return FALSE;
+		}
+
+		return TRUE;
+}
+
+BOOL EjectDll(DWORD dwPID, LPCTSTR szDllName)
+{
+	BOOL bMore = FALSE, bFound = FALSE;
+	HANDLE hSnapshot, hProcess, hThread;
+	HMODULE hModule = NULL;
+	MODULEENTRY32 me = { sizeof(me) }; // 해당 모듈 정보를 저장하는 구조체 
+	LPTHREAD_START_ROUTINE pThreadProc;
+
+	//4-1. 프로세스에 로딩된 DLL 정보 구하기 
+	hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, dwPID);
+
+	// 4-2. 위에서 구한 핸들을 Process32First와 Process32Next 함수에 넘겨주어 MODULEENTRY32 구조체에 모듈 정보를 세팅한다.
+	bMore = Module32First(hSnapshot, &me);
+	for (; bMore; bMore = Module32Next(hSnapshot, &me)) {
+		if (!_tcsicmp((LPCTSTR) me.szModule, szDllName) || !_tcsicmp((LPCTSTR)me.szExePath, szDllName))  //szModule은 dll 이름
+		{
+			bFound = TRUE;
+			break;
+		}
+	}
+
+	if (!bFound)
+	{
+		CloseHandle(hSnapshot);
+		return FALSE;
+	}
+
+	// 4-3. 프로세스 ID를 이용하여 프로세스의 핸들을 구한다. 
+	if (!(hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, dwPID)))
+	{
+		_tprintf(L"OpenProcess(%d) failed!!! [%d]\n", dwPID, GetLastError());
+		return FALSE;
+	}
+
+
+	// 4-4. FreeLibrary() API 주소 구하기 _ (FreeLibrary 주소는 모든 프로세스에 대해 동일함)
+	  // + FreeLibrary : DLL 모듈이 더 이상 필요하지 않을때, 프로세스는 FreeLibrary를 호출함.
+	hModule = GetModuleHandle(L"kernel32.dll");
+	pThreadProc = (LPTHREAD_START_ROUTINE)GetProcAddress(hModule, "FreeLibrary");
+
+
+	// 4-5. 대상 프로세스에 스레드를 실행시킴
+	  // 스레드 함수로 FreeLibrary 함수를 지정하여, 파라미터로 DLL로딩 주소를 넘겨주어 FreeLibrary() 가 실행되도록 한다. 
+	hThread = CreateRemoteThread(hProcess, NULL, 0, pThreadProc, me.modBaseAddr, 0, NULL);  // modBaseAddr은 dll이 로딩된 주소(프로세스 가상메모리)
+	WaitForSingleObject(hThread, INFINITE);
+
+	CloseHandle(hThread);
+	CloseHandle(hProcess);
+	CloseHandle(hSnapshot);
+
+	return TRUE;
+}
